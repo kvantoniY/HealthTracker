@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Env
+.env
+.env.* 
+!.env.example
+
+# Node
+**/node_modules/
+**/dist/
+**/build/
+**/.cache/
+**/.turbo/
+**/.next/
+**/coverage/
+
+# SQLite (если у тебя файл БД лежит в проекте)
+**/*.sqlite
+**/*.sqlite3
+**/db.sqlite
+**/database.sqlite
+
+# IDE
+.vscode/
+.idea/

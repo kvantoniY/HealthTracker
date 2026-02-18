@@ -1,0 +1,989 @@
+openapi: 3.0.3
+info:
+  title: Mental Social API
+  version: 1.0.0
+  description: |
+    Express + SQLite + Sequelize backend for mini social network + mood tracker.
+
+servers:
+  - url: http://localhost:4000
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: MoodEntries
+  - name: Posts
+  - name: Comments
+  - name: Friendships
+  - name: Uploads
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Validation error
+            details:
+              oneOf:
+                - type: array
+                  items:
+                    type: object
+                    properties:
+                      type: { type: string, example: field }
+                      msg: { type: string, example: Invalid value }
+                      path: { type: string, example: email }
+                      location: { type: string, example: body }
+                - type: object
+                  additionalProperties: true
+          required: [message]
+      required: [error]
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+      required: [ok]
+
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+      required: [ok]
+
+    # ===== Users =====
+    UserPublic:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        username: { type: string, example: ivan }
+        displayName: { type: string, nullable: true, example: ivan }
+        avatarUrl: { type: string, nullable: true, example: /uploads/abc.png }
+      required: [id, username]
+
+    UserPrivate:
+      allOf:
+        - $ref: '#/components/schemas/UserPublic'
+        - type: object
+          properties:
+            email: { type: string, example: ivan@test.com }
+            bio: { type: string, nullable: true, example: "hi" }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+          required: [email, createdAt, updatedAt]
+
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+        user:
+          $ref: '#/components/schemas/UserPrivate'
+      required: [token, user]
+
+    # ===== Mood Entries =====
+    MoodEntry:
+      type: object
+      properties:
+        id: { type: integer, example: 10 }
+        ownerId: { type: integer, example: 1 }
+        date: { type: string, format: date, example: "2026-02-18" }
+        sleepHours: { type: number, nullable: true, example: 7.5 }
+        stressLevel: { type: integer, nullable: true, example: 3, description: "0..10" }
+        moodScore: { type: integer, nullable: true, example: 80, description: "1..100" }
+        notes: { type: string, nullable: true, example: "ok" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, ownerId, date, createdAt, updatedAt]
+
+    MoodEntryCreate:
+      type: object
+      properties:
+        date: { type: string, format: date, example: "2026-02-18" }
+        sleepHours: { type: number, example: 7 }
+        stressLevel: { type: integer, example: 3 }
+        moodScore: { type: integer, example: 80 }
+        notes: { type: string, example: "feels good" }
+      required: [date]
+
+    MoodEntryUpdate:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        sleepHours: { type: number }
+        stressLevel: { type: integer, minimum: 0, maximum: 10 }
+        moodScore: { type: integer, minimum: 1, maximum: 100 }
+        notes: { type: string }
+
+    MoodEntryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/MoodEntry' }
+      required: [data]
+
+    MoodEntrySingleResponse:
+      type: object
+      properties:
+        data:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/MoodEntry'
+            - type: "null"
+      required: [data]
+
+    # ===== Posts / Comments =====
+    Comment:
+      type: object
+      properties:
+        id: { type: integer, example: 100 }
+        postId: { type: integer, example: 55 }
+        authorId: { type: integer, example: 2 }
+        text: { type: string, example: "Nice!" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        author:
+          allOf:
+            - $ref: '#/components/schemas/UserPublic'
+          nullable: true
+      required: [id, postId, authorId, text, createdAt, updatedAt]
+
+    CommentCreate:
+      type: object
+      properties:
+        text: { type: string, example: "держись" }
+      required: [text]
+
+    CommentUpdate:
+      type: object
+      properties:
+        text: { type: string, example: "updated text" }
+
+    Post:
+      type: object
+      properties:
+        id: { type: integer, example: 55 }
+        authorId: { type: integer, example: 1 }
+        text: { type: string, example: "Сегодня день норм" }
+        scope:
+          type: string
+          enum: [day, week]
+          example: day
+        attachedDate: { type: string, format: date, nullable: true, example: "2026-02-18" }
+        attachedMoodScore: { type: integer, nullable: true, example: 80 }
+        photos:
+          type: array
+          items: { type: string }
+          example: ["/uploads/a.png", "/uploads/b.png"]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+        author:
+          allOf:
+            - $ref: '#/components/schemas/UserPublic'
+          nullable: true
+
+        Comments:
+          type: array
+          items: { $ref: '#/components/schemas/Comment' }
+          nullable: true
+
+        likes:
+          type: array
+          description: List of users who liked (returned as {id} objects in our include).
+          items:
+            type: object
+            properties:
+              id: { type: integer, example: 2 }
+          nullable: true
+      required: [id, authorId, text, scope, createdAt, updatedAt]
+
+    PostCreate:
+      type: object
+      properties:
+        text: { type: string, example: "Сегодня день норм" }
+        scope: { type: string, enum: [day, week], example: day }
+        attachedDate: { type: string, format: date, example: "2026-02-18" }
+        attachedMoodScore: { type: integer, example: 80 }
+        photos:
+          type: array
+          items: { type: string }
+          example: []
+      required: [text]
+
+    PostUpdate:
+      type: object
+      properties:
+        text: { type: string }
+        scope: { type: string, enum: [day, week] }
+        attachedDate: { type: string, format: date, nullable: true }
+        attachedMoodScore: { type: integer, nullable: true }
+        photos:
+          type: array
+          items: { type: string }
+
+    PostListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Post' }
+      required: [data]
+
+    PostSingleResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Post' }
+      required: [data]
+
+    # ===== Friendships =====
+    Friendship:
+      type: object
+      properties:
+        id: { type: integer, example: 77 }
+        requesterId: { type: integer, example: 1 }
+        addresseeId: { type: integer, example: 2 }
+        status:
+          type: string
+          enum: [pending, accepted, blocked]
+          example: pending
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        requester:
+          allOf:
+            - $ref: '#/components/schemas/UserPublic'
+          nullable: true
+        addressee:
+          allOf:
+            - $ref: '#/components/schemas/UserPublic'
+          nullable: true
+      required: [id, requesterId, addresseeId, status, createdAt, updatedAt]
+
+    FriendshipCreate:
+      type: object
+      properties:
+        addresseeId: { type: integer, example: 2 }
+      required: [addresseeId]
+
+    FriendshipUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, accepted, blocked]
+          example: accepted
+      required: [status]
+
+    FriendshipListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Friendship' }
+      required: [data]
+
+    FriendshipSingleResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Friendship' }
+      required: [data]
+
+    # ===== Uploads =====
+    UploadResponse:
+      type: object
+      properties:
+        url: { type: string, example: "/uploads/8fd3c1d2a1.png" }
+      required: [url]
+
+  responses:
+    Unauthorized:
+      description: Unauthorized (missing/invalid Bearer token)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            missingToken:
+              value:
+                error: { message: "Missing Bearer token" }
+            invalidToken:
+              value:
+                error: { message: "Invalid token" }
+
+    Forbidden:
+      description: Forbidden (ownership / permissions)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value:
+                error: { message: "Forbidden" }
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            nf:
+              value:
+                error: { message: "Not found" }
+
+    ValidationError:
+      description: Validation error (express-validator)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/_health:
+    get:
+      tags: [Health]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+
+  # ===== Auth =====
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user (returns JWT)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password]
+              properties:
+                email: { type: string, format: email, example: ivan@test.com }
+                username: { type: string, example: ivan }
+                password: { type: string, example: Password123! }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                exists:
+                  value:
+                    error: { message: "User already exists" }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email or username (identifier) (returns JWT)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier: { type: string, example: ivan@test.com }
+                password: { type: string, example: Password123! }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                invalid:
+                  value:
+                    error: { message: "Invalid credentials" }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user by token
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/UserPrivate' }
+                required: [user]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===== Users =====
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Get my profile
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/UserPrivate' }
+                required: [user]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Users]
+      summary: Update my profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, example: "Ivan" }
+                bio: { type: string, example: "About me" }
+                avatarUrl: { type: string, example: "/uploads/avatar.png" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/UserPrivate' }
+                required: [user]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  # ===== Mood Entries =====
+  /api/mood-entries:
+    get:
+      tags: [MoodEntries]
+      summary: List my mood entries (optionally by date range)
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+          description: Inclusive start date (YYYY-MM-DD)
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+          description: Inclusive end date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MoodEntryListResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+    post:
+      tags: [MoodEntries]
+      summary: Create mood entry (owner is current user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoodEntryCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MoodEntrySingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/mood-entries/by-date/{date}:
+    get:
+      tags: [MoodEntries]
+      summary: Get my mood entry by exact date
+      parameters:
+        - in: path
+          name: date
+          required: true
+          schema: { type: string, format: date }
+          description: YYYY-MM-DD
+      responses:
+        '200':
+          description: OK (data may be null if no entry)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MoodEntrySingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/mood-entries/{id}:
+    put:
+      tags: [MoodEntries]
+      summary: Update my mood entry by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoodEntryUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MoodEntrySingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [MoodEntries]
+      summary: Delete my mood entry by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===== Posts =====
+  /api/posts:
+    get:
+      tags: [Posts]
+      summary: Feed (supports pagination and optional author filter)
+      parameters:
+        - in: query
+          name: authorId
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostListResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Posts]
+      summary: Create post (author is current user; do NOT pass authorId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostSingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/posts/{id}:
+    get:
+      tags: [Posts]
+      summary: Get post by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostSingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Posts]
+      summary: Update my post (ownership enforced)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostSingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Posts]
+      summary: Delete my post (ownership enforced)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/posts/{id}/like:
+    post:
+      tags: [Posts]
+      summary: Like a post (idempotent)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                nf:
+                  value:
+                    error: { message: "Post not found" }
+
+  /api/posts/{id}/unlike:
+    post:
+      tags: [Posts]
+      summary: Unlike a post (idempotent)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===== Comments =====
+  /api/posts/{postId}/comments:
+    post:
+      tags: [Comments]
+      summary: Create comment for a post (author is current user)
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Comment' }
+                required: [data]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                nf:
+                  value:
+                    error: { message: "Post not found" }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/comments/{id}:
+    put:
+      tags: [Comments]
+      summary: Update my comment (ownership enforced)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Comment' }
+                required: [data]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags: [Comments]
+      summary: Delete my comment (ownership enforced)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===== Friendships =====
+  /api/friendships:
+    get:
+      tags: [Friendships]
+      summary: List my friendships (sent + received), optionally filter by status
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, accepted, blocked]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FriendshipListResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+    post:
+      tags: [Friendships]
+      summary: Send friend request to addresseeId (creates pending)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FriendshipCreate' }
+      responses:
+        '201':
+          description: Created (or 200 if already exists)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FriendshipSingleResponse' }
+        '200':
+          description: Already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FriendshipSingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                nf:
+                  value:
+                    error: { message: "User not found" }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/friendships/{id}:
+    put:
+      tags: [Friendships]
+      summary: Update friendship status (requester OR addressee only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FriendshipUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FriendshipSingleResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags: [Friendships]
+      summary: Delete friendship (requester OR addressee only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===== Uploads =====
+  /api/uploads:
+    post:
+      tags: [Uploads]
+      summary: Upload a file (multipart/form-data) - returns URL (store in Post.photos)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
