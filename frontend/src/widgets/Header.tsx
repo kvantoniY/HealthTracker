@@ -26,13 +26,11 @@ export function Header() {
     <header className="header">
       <div className="container headerInner">
         <div className="row" style={{ alignItems: 'center' }}>
-          <Link href="/" className="pill">
-            HealthTracker
-          </Link>
           <nav className="nav">
             <Link href="/" className={`pill ${isActive('/') ? 'pill-active' : ''}`}>Главная</Link>
             <Link href="/dashboard" className={`pill ${isActive('/dashboard') ? 'pill-active' : ''}`}>Дашборд</Link>
             <Link href="/settings" className={`pill ${isActive('/settings') ? 'pill-active' : ''}`}>Настройки</Link>
+            <Link href="/healthtracker" className={`pill ${isActive('/healthtracker') ? 'pill-active' : ''}`}>HealthTracker</Link>
           </nav>
         </div>
 
