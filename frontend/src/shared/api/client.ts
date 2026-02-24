@@ -1,3 +1,4 @@
+import { useAppSelector } from '@/store/hooks';
 import axios from 'axios';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';

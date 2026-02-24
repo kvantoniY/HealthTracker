@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { logout } from '@/store/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
@@ -15,22 +16,21 @@ function Avatar({ url, label }: { url?: string | null; label: string }) {
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
   const user = useAppSelector((s) => s.auth.user);
-
+  const isActive = (path: string) => pathname === path;
   const displayName = user?.displayName || user?.username || 'User';
 
   return (
     <header className="header">
       <div className="container headerInner">
         <div className="row" style={{ alignItems: 'center' }}>
-          <Link href="/" className="pill">
-            HealthTracker
-          </Link>
           <nav className="nav">
-            <Link href="/" className="pill">Главная</Link>
-            <Link href="/dashboard" className="pill">Дашборд</Link>
-            <Link href="/settings" className="pill">Настройки</Link>
+            <Link href="/" className={`pill ${isActive('/') ? 'pill-active' : ''}`}>Главная</Link>
+            <Link href="/dashboard" className={`pill ${isActive('/dashboard') ? 'pill-active' : ''}`}>Дашборд</Link>
+            <Link href="/settings" className={`pill ${isActive('/settings') ? 'pill-active' : ''}`}>Настройки</Link>
+            <Link href="/healthtracker" className={`pill ${isActive('/healthtracker') ? 'pill-active' : ''}`}>HealthTracker</Link>
           </nav>
         </div>
 
