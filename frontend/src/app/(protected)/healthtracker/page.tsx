@@ -74,10 +74,6 @@ export default function HealthTrackerPage() {
 
           <p>Заметка дня: {mood.notes}</p>
 
-          {/* если хочешь — сюда кнопку "Сохранить изменения" */}
-          {/* <button onClick={() => dispatch(updateMood({ date: mood.date, stressLevel, sleepHours }))}>
-            Сохранить
-          </button> */}
         </div>
       )}
     </div>
